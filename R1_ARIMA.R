@@ -1,11 +1,14 @@
+#Import dataset from environment
 library(readxl)
 > citybike_all <- read_excel("C:/Users/gisha/Downloads/citybike all.xlsx")
 > View(citybike_all)
+
+#Identify if imported dataset is recognized
 > class(citybike_all)
 [1] "tbl_df"     "tbl"        "data.frame"
-> citybike_all$Month <- as.Date(citybike_all$Month,"%B-%Y")
-> citybike_all$Month <- as.Date(citybike_all$Month,"%d-%B-%Y")
-> ?ts
+
+#Convert to time series if not recognized as a time series
+> ?ts 
 > citi.ts <- ts(citybike_all$Trips, start = min(citybike_all$Year), end = max(citybike_all$Year), frequency = 12)
 > citi.ts
        Jan   Feb   Mar   Apr   May   Jun   Jul   Aug   Sep   Oct   Nov   Dec
@@ -17,6 +20,7 @@ library(readxl)
 2020  3421                                                                  
 > class(citi.ts)
 [1] "ts"
+
 > library(forecast)
 Registered S3 method overwritten by 'quantmod':
   method            from
@@ -29,9 +33,16 @@ Registered S3 method overwritten by 'quantmod':
 
     See ‘library(help="tseries")’ for details.
 
+#plot the time series to understand the data better
 > plot(citi.ts)
+
+#auto correlation - If the plot crosses the blue line, it means there is high correlation. If the lines go above the blue line, it means that the data is not stationary.
 > acf(citi.ts)
+
+#partial auto correlation
 > pacf(citi.ts)
+
+#Dickey-Fuller test to check if stationary
 > adf.test(citi.ts)
 
 	Augmented Dickey-Fuller Test
@@ -42,8 +53,8 @@ alternative hypothesis: stationary
 
 Warning message:
 In adf.test(citi.ts) : p-value smaller than printed p-value
-> auto.arima()
-Error in as.ts(x) : argument "y" is missing, with no default
+
+#If not stationary, use arima to make stationary
 > ?auto.arima
 > citi.test.arima <- auto.arima(citi.ts,ic="aic",trace = TRUE)
 
@@ -60,10 +71,15 @@ Error in as.ts(x) : argument "y" is missing, with no default
  ARIMA(1,1,0)(0,1,1)[12]                    : Inf
  ARIMA(1,1,2)(0,1,1)[12]                    : Inf
 
- Best model: ARIMA(0,1,1)(0,1,1)[12]                    
+ Best model: ARIMA(0,1,1)(0,1,1)[12]   
 
+#ARIMA(p,d,q)
+
+#before forecasting, confirm if stationary
 > acf(ts(citi.test.arima$residuals))
 > pacf(ts(citi.test.arima$residuals))
+
+#forecast data
 > citiforecast=forecast(citi.ts,level=c(95),h=3*12)
 > citiforecast
          Point Forecast      Lo 95     Hi 95
@@ -104,6 +120,8 @@ Nov 2022       4364.135 1785.47199  6942.798
 Dec 2022       3593.094  998.86774  6187.320
 Jan 2023       2530.657  -79.04318  5140.356
 > plot(citiforecast)
+
+#validate using box test
 > ?Box.test
 > Box.test(citiforecast,lag=5,type = "Ljung-Box")
 
@@ -126,6 +144,9 @@ X-squared = Inf, df = 15, p-value < 2.2e-16
 data:  citiforecast
 X-squared = 13.207, df = 5, p-value = 0.02151
 
+# If p < 0.05, it means data has auto correlation issue
+
+#Correcting issue
 > boxplot(citybike_all$Trips)
 > citi.arima.forecast=forecast(citi.test.arima,level=c(95),h=3*12)
 > plot(citi.arima.forecast)
@@ -163,3 +184,5 @@ X-squared = 32.624, df = 30, p-value = 0.3391
 
 data:  citi.arima.forecast$residuals
 X-squared = 4.8287, df = 5, p-value = 0.4371
+
+#p value is not less than 0.05, hence no auto correlation issue.
